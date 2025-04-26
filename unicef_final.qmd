@@ -1,0 +1,257 @@
+---
+title: "UNICEF World Issue Report"
+author: "Data Analyst - Shraddha"
+format:
+  html:
+    embed-resources: true
+    toc: true
+    toc-location: right
+    toc-depth: 3
+    code-fold: true
+    theme: journal
+---
+
+# Executive Summary
+
+This report analyzes global inequalities in access to clean water, a basic human right crucial for children's survival and development. We examine disparities across countries, relationships between GDP and water access, and global trends over time. The data reveals progress in some areas, but significant gaps remain, especially in low-income nations.
+
+# Introduction
+
+**UNICEF** plays a vital role in supporting children's rights worldwide. Access to clean water is fundamental, yet millions of children live without it. Poor water access severely impacts children's health, education, and futures.
+
+This report visualizes global data to uncover patterns in water access and explore economic influences.
+
+# Data Sources
+
+- **UNICEF Indicator Data**: Water access indicators.
+- **World Bank Metadata**: Birth rates, GDP per capita.
+
+# Key Focus Areas
+
+- **Child mortality rates**
+- **Access to clean water**
+- **Inequalities across countries**
+- **GDP vs. Water access relationships**
+
+---
+
+# 1. Data Preparation
+
+```{python}
+#| code-fold: true
+import pandas as pd
+import geopandas as gpd
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Load the datasets
+indicator1 = pd.read_csv("unicef_indicator_1.csv")
+indicator2 = pd.read_csv("unicef_indicator_2.csv")
+metadata = pd.read_csv("unicef_metadata.csv")
+
+# Merge datasets
+data = pd.concat([indicator1, indicator2], ignore_index=True)
+
+# Standardize country name column
+if "country name" in metadata.columns:
+    metadata.rename(columns={"country name": "country"}, inplace=True)
+if "country" not in metadata.columns:
+    raise ValueError("The 'metadata' file does not contain a 'country' column.")
+
+# Join with metadata
+full_data = data.merge(metadata, how="left", on="country")
+full_data.head()
+```
+
+---
+
+# 2. Access to Clean Water: World Map {#world-map}
+
+```{python}
+#| code-fold: true
+# Load world geometries
+world = gpd.read_file(
+    "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_110m_admin_0_countries.geojson",
+    engine="pyogrio"
+)
+
+# Select indicator
+water_access = full_data[full_data['indicator'] == 'Proportion of population using non-piped improved drinking water sources']
+water_access = water_access[['country', 'obs_value']]
+
+# Merge
+world_data = world.merge(water_access, how="left", left_on="NAME", right_on="country")
+
+# Plot
+fig, ax = plt.subplots(figsize=(15, 8))
+world_data.plot(column='obs_value', cmap='Blues', legend=True, legend_kwds={'label': "Water Access (%)"}, edgecolor='black', ax=ax)
+ax.set_title('Access to Non-Piped Improved Drinking Water Sources', fontsize=15)
+ax.axis('off')
+plt.figtext(0.5, 0.01, 'Darker blue indicates higher access to improved drinking water.', ha='center', fontsize=10)
+plt.show()
+```
+
+**Explanation:** This map shows the percentage of population using non-piped improved water sources. Areas with lighter shades require urgent attention.
+
+---
+
+# 3. Distribution of Clean Water Access (Histogram) {#histogram}
+
+```{python}
+#| code-fold: true
+sns.histplot(water_access['obs_value'].dropna(), bins=20, color='skyblue', edgecolor='black')
+plt.title('Distribution of Access to Non-Piped Improved Drinking Water')
+plt.xlabel('Access to Water (%)')
+plt.ylabel('Number of Countries')
+plt.tight_layout()
+plt.figtext(0.5, 0.01, 'Shows how many countries fall into different access rate bands.', ha='center', fontsize=10)
+plt.show()
+```
+
+**Explanation:** The histogram shows that most countries have mid-range water access, while a smaller group either excels or struggles significantly.
+
+---
+
+# 4. Top 15 Countries by Water Access (Bar Chart) {#top-countries}
+
+```{python}
+#| code-fold: true
+# Top 15 countries
+top_countries = water_access.sort_values(by="obs_value", ascending=False).head(15)
+
+# Bar plot
+sns.barplot(
+    y="country", 
+    x="obs_value", 
+    data=top_countries, 
+    palette="Set2",
+    order=top_countries.sort_values('obs_value', ascending=False)['country']
+)
+plt.title('Top 15 Countries by Access to Non-Piped Improved Drinking Water')
+plt.xlabel('Access (%)')
+plt.ylabel('Country')
+plt.tight_layout()
+plt.figtext(0.5, 0.01, 'Ranks countries with the best water access.', ha='center', fontsize=10)
+plt.show()
+```
+
+**Explanation:** This sorted bar chart highlights countries leading in clean water access, mostly wealthier nations or small, developed states.
+
+---
+
+# 5. Comparison of Water Source Types (Bar Chart) {#comparison}
+
+```{python}
+#| code-fold: true
+# Compare piped vs non-piped
+piped = full_data[full_data['indicator'] == 'Proportion of population using piped drinking water sources']
+non_piped = full_data[full_data['indicator'] == 'Proportion of population using non-piped improved drinking water sources']
+
+piped_avg = piped['obs_value'].mean() if not piped.empty else 0
+non_piped_avg = non_piped['obs_value'].mean()
+
+comparison = pd.DataFrame({
+    'Water Source': ['Piped', 'Non-Piped Improved'],
+    'Average Access (%)': [piped_avg, non_piped_avg]
+})
+
+# Bar plot
+sns.barplot(
+    x="Water Source", 
+    y="Average Access (%)", 
+    data=comparison, 
+    palette="Set3"
+)
+plt.title('Comparison of Piped vs Non-Piped Improved Water Access')
+plt.ylabel('Average Access (%)')
+plt.tight_layout()
+plt.figtext(0.5, 0.01, 'Comparing average access between piped and non-piped sources.', ha='center', fontsize=10)
+plt.show()
+```
+
+**Explanation:** Piped water access generally surpasses non-piped options, but many regions still depend on non-piped sources.
+
+---
+
+# 6. Birth Rate Distribution (Boxplot) {#birthrate}
+
+```{python}
+#| code-fold: true
+birth_rate = metadata[['country', 'Birth rate, crude (per 1,000 people)']].dropna()
+
+sns.boxplot(y='Birth rate, crude (per 1,000 people)', data=birth_rate, color='coral')
+plt.title('Distribution of Crude Birth Rate')
+plt.ylabel('Birth Rate (per 1,000 people)')
+plt.tight_layout()
+plt.figtext(0.5, 0.01, 'Outliers represent countries with unusually high or low birth rates.', ha='center', fontsize=10)
+plt.show()
+```
+
+**Explanation:** Higher birth rates often correlate with poorer water access and weaker infrastructure.
+
+---
+
+# 7. GDP vs Water Access (Scatter Plot with Regression) {#gdp-water}
+
+```{python}
+#| code-fold: true
+from scipy.stats import linregress
+
+# GDP vs water access
+gdp_water = non_piped.dropna(subset=["GDP per capita (constant 2015 US$)"])
+
+# Regression line
+slope, intercept, r_value, p_value, std_err = linregress(gdp_water['GDP per capita (constant 2015 US$)'], gdp_water['obs_value'])
+
+plt.figure(figsize=(10, 6))
+sns.regplot(x="GDP per capita (constant 2015 US$)", y="obs_value", data=gdp_water, scatter_kws={"s":50}, line_kws={"color":"red"})
+plt.title('GDP per Capita vs Non-Piped Improved Water Access')
+plt.xlabel('GDP per Capita (constant 2015 US$)')
+plt.ylabel('Water Access (%)')
+plt.figtext(0.5, 0.01, f'Regression Line: y={slope:.2f}x + {intercept:.2f}, r²={r_value**2:.2f}', ha='center', fontsize=10)
+plt.tight_layout()
+plt.show()
+```
+
+**Explanation:** Wealthier countries enjoy much better water access. The strong positive correlation suggests economic growth benefits clean water initiatives.
+
+---
+
+# 8. Global Average Water Access Over Time (Line Plot) {#trend-over-time}
+
+```{python}
+#| code-fold: true
+avg_yearly = non_piped.groupby('time_period')['obs_value'].mean().reset_index()
+
+plt.figure(figsize=(10, 6))
+sns.lineplot(x="time_period", y="obs_value", data=avg_yearly, marker="o", color="blue")
+plt.title('Global Average Non-Piped Water Access Over Time')
+plt.xlabel('Year')
+plt.ylabel('Average Access (%)')
+
+# Highlighting major points
+max_point = avg_yearly.loc[avg_yearly['obs_value'].idxmax()]
+min_point = avg_yearly.loc[avg_yearly['obs_value'].idxmin()]
+
+plt.annotate('Peak', xy=(max_point['time_period'], max_point['obs_value']), xytext=(max_point['time_period']+1, max_point['obs_value']+1), arrowprops=dict(arrowstyle='->'))
+plt.annotate('Trough', xy=(min_point['time_period'], min_point['obs_value']), xytext=(min_point['time_period']-1, min_point['obs_value']-1), arrowprops=dict(arrowstyle='->'))
+
+plt.tight_layout()
+plt.figtext(0.5, 0.01, 'Despite progress, growth is not uniform across time.', ha='center', fontsize=10)
+plt.show()
+```
+
+**Explanation:** While access rates have improved globally, progress is uneven and highlights periods needing investigation.
+
+---
+
+# Conclusion
+
+Access to clean water remains deeply unequal worldwide. GDP shows a strong influence, indicating structural poverty as a major barrier. While progress is visible over time, many nations are far from achieving universal clean water.
+
+**UNICEF's role** in advocacy, infrastructure development, and direct aid remains critical.
+
+# GitHub Repository
+
+This report is hosted on GitHub Pages: [GitHub Repo Link](https://github.com/ShraddhaG-create/Unicef_report)
+
