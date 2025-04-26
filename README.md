@@ -1,5 +1,6 @@
 # UNICEF World Issue Report
-This project report is available under this link : https://shraddhag-create.github.io/Unicef_report/
+This project report is available under this link : https://shraddhag-create.github.io/Unicef_report/.
+
 This project analyzes global challenges in **clean water access**, **child health**, and **economic development** using real-world UNICEF datasets.
 
 The report includes **interactive charts**, **trend analyses**, and **policy insights**. It was created using **Python**, **Seaborn**, **GeoPandas**, and **Quarto**.
